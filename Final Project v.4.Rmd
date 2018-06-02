@@ -1,0 +1,42 @@
+---
+title: "Final Project"
+author: "Kyle Duplessis, Dean Gladish & Kavie Yu"
+date: "5/30/2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+Natality <- Natality
+library(dplyr)
+library(ggformula)
+library(broom)
+library(gridExtra)
+library(Sleuth3)
+library(car)
+```
+
+```{r}
+View(Natality)
+```
+
+
+```{r}
+# Turns Tobacco Use into 1s and 0s - yes and no
+Natality <- mutate(Natality, TobaccoUseCodeBinary = TobaccoUseCode - 1)
+
+# Removes all table entries where TobaccoUse is Not Stated
+Natality <- Natality[!(Natality$TobaccoUse == "Not Stated"),]
+
+# Removes all table entries where Education is not stated
+Natality <- Natality[!(Natality$Education == "Unknown/Not on certificate"),]
+
+Natality$EducationCode <- factor(Natality$EducationCode, labels = c("8thGrade", "12thGrade", "HS/GED", "SomeCollege", "AssociateDegree", "BachelorsDegree", "Masters", "Doctorate"))
+
+library(MASS)
+mod.base <- lm(AverageBirthWeight ~ State + Education + DeliveryMethod + TobaccoUse + AverageAgeofMother, data = Natality)
+summary(mod.base)
+```
