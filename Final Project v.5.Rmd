@@ -1,0 +1,239 @@
+---
+title: "Final Project"
+author: "Kyle Duplessis, Dean Gladish & Kavie Yu"
+date: "5/30/2018"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+Natality <- Natality_2007_2016
+library(dplyr)
+library(ggformula)
+library(broom)
+library(gridExtra)
+library(Sleuth3)
+library(car)
+library(ggplot2)
+```
+
+```{r}
+View(Natality)
+```
+
+
+```{r}
+# Turns Tobacco Use into 1s and 0s - yes and no
+Natality <- mutate(Natality, TobaccoUseCodeBinary = TobaccoUseCode - 1)
+
+# Removes all table entries where TobaccoUse is Not Stated
+Natality <- Natality[!(Natality$TobaccoUse == "Not Stated"),]
+
+# Removes all table entries where Education is not stated
+Natality <- Natality[!(Natality$Education == "Unknown/Not on certificate"),]
+
+Natality$EducationCode <- factor(Natality$EducationCode, labels = c("8thGrade", "12thGrade", "HS/GED", "SomeCollege", "AssociateDegree", "BachelorsDegree", "Masters", "Doctorate"))
+
+Natality$Region <- factor(Natality$Region, labels = c("NorthEast", "MidWest", "South", "SouthWest", "West"))
+
+library(MASS)
+mod.base <- lm(AverageBirthWeight ~ Region + DeliveryMethod + TobaccoUse + AverageAgeofMother, data = Natality)
+mod.plus <- lm(log(as.numeric(AverageBirthWeight)) ~ Region + DeliveryMethod + TobaccoUse + AverageAgeofMother, data = Natality)
+summary(mod.base)
+```
+
+
+
+##(A) 
+Since we are trying to predict an age range for mothers that are interested in having a baby in a "healthy weight," we will set aside 25% of our data to test the efficacy of our model once we have it. 
+
+```{r}
+index <- sample(nrow(Natality), size = nrow(Natality)*0.75)
+train_Natality <- Natality[index,]
+test_Natality <- Natality[-index,]
+```
+
+```{r}
+View(train_Natality)
+```
+
+```{r}
+View(test_Natality)
+```
+
+##(B) EDA
+
+###(i) barplots
+
+```{r}
+barplot1 <- gf_bar(~Region, data = train_Natality)
+barplot1
+```
+```{r}
+barplot2 <- gf_bar(~TobaccoUse, data = train_Natality)
+barplot2
+```
+
+```{r}
+gf_bar(~EducationCode, data = train_Natality)
+```
+
+
+```{r}
+gf_histogram(~AverageAgeofMother, data = train_Natality)
+```
+
+###(ii) Scatterplot
+```{r}
+plot(AverageBirthWeight ~ AverageAgeofMother , data = train_Natality)
+```
+
+
+###(iii) Boxplots
+```{r}
+boxplot(AverageBirthWeight ~ Region, data = train_Natality)
+```
+
+
+###(iv) Barplots
+```{r}
+library(viridisLite)
+gf_bar( ~ TobaccoUse, data = train_Natality, fill = ~Region)
+```
+
+
+```{r}
+library(broom)
+resid_mod_base <- augment(mod.base)
+head(resid_mod_base)
+```
+
+##(C) Model Assumptions Check
+
+###(i) QQ-plot for checking constant variance
+```{r}
+  gf_qq(~.std.resid, data = resid_mod_base) %>%
+   gf_qqline() %>%
+   gf_labs(x = "N(0,1) quantiles", y = "Standardized residuals" )
+```
+
+```{r}
+library(broom)
+resid_mod_plus <- augment(mod.plus)
+head(resid_mod_plus)
+```
+
+```{r}
+  gf_qq(~.std.resid, data = resid_mod_plus) %>%
+   gf_qqline() %>%
+   gf_labs(x = "N(0,1) quantiles", y = "Standardized residuals" )
+```
+Transformation does not seem to be necessary. The QQ-plot also indicates heavy tails, particularly on the left side of the distribution of residuals; this means that our assumption of a normal distribution of residuals is not violated but that the distribution has a little more variance than usual.  We could assume that the residuals follow a t-distribution.  
+
+###(ii) Residual plot for checking linearity
+
+
+It appears that the linearity is satisfied by this model, as the points are randomly dispersed around the horizontal line. 
+```{r}
+  gf_point(.resid ~ .fitted, data = resid_mod_base) %>%
+    gf_hline(yintercept = 0, col = "blue", lty = 2) %>%
+    gf_labs(x = "Fitted values", y = "Residuals", title = "Residuals vs. Fitted Values")
+```
+
+###(iii) Independence
+The location of any response variable in relation to its mean cannot be predicted from the knowledge of the explanatory variable. 
+
+##(D) Model Diagnostics
+
+###(i) Check for influential points and high-leverages
+```{r}
+    library(car)
+    influenceIndexPlot(mod.base, id.n = 3)                      # row numbers of high 3 cases
+```
+
+The studentized residuals are too high for data points 63 (with an average birthweight of 2446.04 grams), 657(with an average birthweight of 2515.94 grams) and 1122 (with an average birthweight of 2683.07 grams). Our reference number 4, since this is a large dataset. 
+
+Data point 1486 (with an average birthweight of 3191.61 grams)has a large hat value. 
+
+
+There appears to be no influential point, as there is no Cook's Distance that is close to 1. 
+
+The reference hat-value we use is 3((p+1)/n) = 0.018. 
+
+After examining the aberrant data points, we still decided to keep the original model, as the Cook's Distance plot did not show any influential points. 
+
+###(ii) Check for multicollinearity
+
+Now we must check for multicollinearity:  
+
+```{r, message = F, warning = F}
+vif(mod.base)
+```
+
+
+Multicollinearity is not suspected. All the VIF values are much smaller than 5. 
+
+
+##(D) Investigate whether our model is sufficient. 
+
+###(i) We included all the interaction terms and created mod.one. 
+We also look at the ANOVA test as well as a modified model according to the AIC criterion.  
+
+```{r, message = F, warning = F}
+mod.one <- lm(AverageBirthWeight ~ Region * DeliveryMethod * TobaccoUse * AverageAgeofMother, data = Natality)
+anova(mod.one, mod.base, test = "Chisq")
+```
+
+Our low p-value indicates that we most likely need interaction terms to be included in our model.  
+
+The following code gives numeric coefficients for our new model:  
+
+###(ii) We used StepAIC to determine an interaction-based model with the lowest AIC criterion using stepwise elimination.  
+```{r}
+mod.forwardstep <- stepAIC(mod.base, scope = list(lower = ~1, upper = ~Region + DeliveryMethod + TobaccoUse + AverageAgeofMother + Region * DeliveryMethod + Region * TobaccoUse + Region * AverageAgeofMother + DeliveryMethod * TobaccoUse + DeliveryMethod * AverageAgeofMother + TobaccoUse * AverageAgeofMother), direction = "both", k = log(nrow(Natality)))
+summary(mod.forwardstep)
+```
+
+
+###(iii) This is our refined model: mod.two.
+
+```{r}
+mod.two <- lm(AverageBirthWeight ~ Region + DeliveryMethod + TobaccoUse + AverageAgeofMother + TobaccoUse*AverageAgeofMother + Region*TobaccoUse, data = Natality)
+summary(mod.two)
+```
+
+
+##(E) Model Assumptions + Diagnostics for the Refined Model: mod.two.:
+
+```{r}
+library(broom)
+resid_mod_two <- augment(mod.two)
+head(resid_mod_two)
+```
+
+```{r}
+  gf_qq(~.std.resid, data = resid_mod_two) %>%
+   gf_qqline() %>%
+   gf_labs(x = "N(0,1) quantiles", y = "Standardized residuals" )
+```
+
+```{r}
+  gf_point(.resid ~ .fitted, data = resid_mod_two) %>%
+    gf_hline(yintercept = 0, col = "blue", lty = 2) %>%
+    gf_labs(x = "Fitted values", y = "Residuals", title = "Residuals vs. Fitted Values")
+```
+
+
+
+```{r}
+    library(car)
+    influenceIndexPlot(mod.two, id.n = 3)                      # row numbers of high 3 cases
+```
+
+
+```{r, message = F, warning = F}
+vif(mod.two)
+```
