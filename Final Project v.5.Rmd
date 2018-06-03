@@ -1,17 +1,19 @@
 ---
 title: "Final Project"
 author: "Kyle Duplessis, Dean Gladish & Kavie Yu"
-date: "5/30/2018"
+date: "6/02/2018"
 output:
   pdf_document: default
   word_document: default
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.width = 3, fig.height = 3)
+knitr::opts_chunk$set(echo = TRUE, fig.width = 4, fig.height = 4)
 ```
 
-```{r, message = F, warning = F}
+After installing some prerequisite packages, we are ready to begin our exploratory data analysis.  
+
+```{r, message = F, warning = F, echo = F, eval = T}
 Natality <- read.csv("C:/Users/gladi/Documents/GitHub/Final-Project/Natality, 2007-2016.csv")
 library(dplyr)
 library(ggformula)
@@ -22,12 +24,9 @@ library(car)
 library(ggplot2)
 ```
 
-```{r}
-View(Natality)
-```
+To begin with, we added to the dataset a binary version of the TobaccoUse variable, a factored Region variable indicating general location, a factored version of the EducationCode variable (shortened), and numericized the AverageBirthWeight variable.  
 
-
-```{r}
+```{r, message = F, warning = F}
 # Turns Tobacco Use into 1s and 0s - yes and no
 Natality <- mutate(Natality, TobaccoUseCodeBinary = TobaccoUseCode - 1)
 
@@ -39,77 +38,90 @@ Natality <- Natality[!(Natality$Education == "Unknown/Not on certificate"),]
 
 Natality$EducationCode <- factor(Natality$EducationCode, labels = c("8thGrade", "12thGrade", "HS/GED", "SomeCollege", "AssociateDegree", "BachelorsDegree", "Masters", "Doctorate"))
 
-Natality$Region <- factor(Natality$Region, labels = c("NorthEast", "MidWest", "South", "SouthWest", "West"))
+Natality$Region <- factor(Natality$Region, 
+                          labels = c("NorthEast", "MidWest", "South", "SouthWest", "West"))
 
 # Turns the Average Birth Weight column into a numeric.  
 
 Natality <- mutate(Natality, AverageBirthWeight = as.numeric(AverageBirthWeight))
-
-library(MASS)
-mod.base <- lm(AverageBirthWeight ~ Region + DeliveryMethod + TobaccoUse + AverageAgeofMother, data = Natality)
-mod.plus <- lm(log(as.numeric(AverageBirthWeight)) ~ Region + DeliveryMethod + TobaccoUse + AverageAgeofMother, data = Natality)
-summary(mod.base)
 ```
 
 
+##(A) The Creation of New Data
+Since our goal for this study is to predict an age range for mothers who are interested in having a baby with a "healthy weight", we will examine three models and select our preferred model.  We will also set aside 25% of our data to test the efficacy of our chosen model.  
 
-##(A) 
-Since we are trying to predict an age range for mothers that are interested in having a baby in a "healthy weight," we will set aside 25% of our data to test the efficacy of our model once we have it. 
 
+We created two new datasets to test and train our model.  
 ```{r}
 index <- sample(nrow(Natality), size = nrow(Natality)*0.75)
 train_Natality <- Natality[index,]
 test_Natality <- Natality[-index,]
 ```
 
-```{r}
-View(train_Natality)
-```
 
-```{r}
-View(test_Natality)
-```
-
-##(B) EDA
+##(B) The Data Analysis
 
 ###(i) barplots
 
 ```{r}
-barplot1 <- gf_bar(~Region, data = train_Natality)
-barplot1
+gf_bar(~Region, data = train_Natality)
 ```
+
+The above barplot indicates that there are the most entries from the South and the fewest numer of entries are from the West.    
+
 ```{r}
-barplot2 <- gf_bar(~TobaccoUse, data = train_Natality)
-barplot2
+gf_bar(~TobaccoUse, data = train_Natality)
 ```
+
+The above barplot indicates that proportionally less people use tobacco in our dataset.  
 
 ```{r}
 gf_bar(~EducationCode, data = train_Natality)
 ```
 
+This plot shows that there is a drop-off in frequency as we approach higher education levels.  
 
 ```{r}
 gf_histogram(~AverageAgeofMother, data = train_Natality)
 ```
+
+This histogram demonstrates that the average age of the mother is generally normally distributed; while it reaches a plateau in the middle of the graph, it also has tails that diminish very quickly and as such the average age of the mother is normally distributed.  
 
 ###(ii) Scatterplot
 ```{r}
 plot(AverageBirthWeight ~ AverageAgeofMother , data = train_Natality)
 ```
 
+This scatterplot shows that despite a large amount of variability, there is a discernably linear and positive association between average age of mother and average birth weight.  
 
 ###(iii) Boxplots
 ```{r}
 boxplot(AverageBirthWeight ~ Region, data = train_Natality)
 ```
 
+This boxplot allows us to see that the distribution of birth weight is different for each region; thus, region is an important variable to include in our model.  
 
 ###(iv) Barplots
+
 ```{r}
 library(viridisLite)
 gf_bar( ~ TobaccoUse, data = train_Natality, fill = ~Region)
 ```
 
+From this barplot of frequency count and TobaccoUse against Region, we can see for example that the West contributes the least count to both groups.  
+
+## Our Model:  
+
+We created two models - mod.base is our linear regression model on all important variables with no interaction terms included.  The only difference between mod.base and mod.plus is that mod.plus assumes that log(AverageBirthWeight) has a linear relationship with our variables instead of AverageBirthWeight having a linear relationship with the rest of the variables in our model.  
+
+```{r, message = F, warning = F}
+library(MASS)
+mod.base <- lm(AverageBirthWeight ~ Region + DeliveryMethod + TobaccoUse + AverageAgeofMother, data = Natality)
+mod.plus <- lm(log(as.numeric(AverageBirthWeight)) ~ Region + DeliveryMethod + TobaccoUse + AverageAgeofMother, data = Natality)
+summary(mod.base)
+```
+
+Then, we find the residuals of our mod.base:  
 
 ```{r}
 library(broom)
@@ -120,11 +132,16 @@ head(resid_mod_base)
 ##(C) Model Assumptions Check
 
 ###(i) QQ-plot for checking constant variance
+
+
+The next few segments of code generate qq-plots that will allow us to determine if the log-transformation was necessary.  
 ```{r}
   gf_qq(~.std.resid, data = resid_mod_base) %>%
    gf_qqline() %>%
    gf_labs(x = "N(0,1) quantiles", y = "Standardized residuals" )
 ```
+
+
 
 ```{r}
 library(broom)
@@ -137,12 +154,16 @@ head(resid_mod_plus)
    gf_qqline() %>%
    gf_labs(x = "N(0,1) quantiles", y = "Standardized residuals" )
 ```
-Transformation does not seem to be necessary. The QQ-plot also indicates heavy tails, particularly on the left side of the distribution of residuals; this means that our assumption of a normal distribution of residuals is not violated but that the distribution has a little more variance than usual.  We could assume that the residuals follow a t-distribution.  
+Transformation does not seem to be necessary. In fact, it seems to be detrimental as our data deviates more from the normal distribution when we use the log-transformation.  
+
+Furthermore, the QQ-plot also indicates heavy tails, particularly on the left side of the distribution of residuals; this means that our assumption of a normal distribution of residuals is not violated but that the distribution has a little more variance than usual.  We could assume that the residuals follow a t-distribution.  
+
+In essence, we have determined our preference for mod.base instead of mod.plus.  
 
 ###(ii) Residual plot for checking linearity
 
+It appears that the linearity is satisfied by this original model, as the points are randomly dispersed around the horizontal line. 
 
-It appears that the linearity is satisfied by this model, as the points are randomly dispersed around the horizontal line. 
 ```{r}
   gf_point(.resid ~ .fitted, data = resid_mod_base) %>%
     gf_hline(yintercept = 0, col = "blue", lty = 2) %>%
@@ -160,7 +181,7 @@ The location of any response variable in relation to its mean cannot be predicte
     influenceIndexPlot(mod.base, id.n = 3)                      # row numbers of high 3 cases
 ```
 
-The studentized residuals are too high for data points 63 (with an average birthweight of 2446.04 grams), 657(with an average birthweight of 2515.94 grams) and 1122 (with an average birthweight of 2683.07 grams). Our reference number 4, since this is a large dataset. 
+The studentized residuals are too high for data points 63 (with an average birthweight of 2446.04 grams), 657 (with an average birthweight of 2515.94 grams) and 1122 (with an average birthweight of 2683.07 grams). Our reference number 4, since this is a large dataset. 
 
 Data point 1486 (with an average birthweight of 3191.61 grams)has a large hat value. 
 
@@ -182,25 +203,28 @@ vif(mod.base)
 
 Multicollinearity is not suspected. All the VIF values are much smaller than 5. 
 
+Given these factors, we select mod.base and now need to make sure that interaction terms truly are not necessary.  
 
 ##(D) Investigate whether our model is sufficient. 
 
-###(i) We included all the interaction terms and created mod.one. 
-We also look at the ANOVA test as well as a modified model according to the AIC criterion.  
+###(i) We included all the interaction terms in a new model called mod.one.  
+
+Looking at the ANOVA chi-square test, we can compare the two models.  
 
 ```{r, message = F, warning = F}
 mod.one <- lm(AverageBirthWeight ~ Region * DeliveryMethod * TobaccoUse * AverageAgeofMother, data = Natality)
 anova(mod.one, mod.base, test = "Chisq")
 ```
 
-Our low p-value indicates that we most likely need interaction terms to be included in our model.  
+Our low p-value indicates that interaction terms indeed do have a significant effect and might be included in our model.  
 
-The following code gives numeric coefficients for our new model:  
+In order to assess which interaction terms might be necessary in a hypothetical refined model of mod.one (mod.forwardstep),  
 
 ###(ii) We used StepAIC to determine an interaction-based model with the lowest AIC criterion using stepwise elimination.  
+
+
 ```{r}
 mod.forwardstep <- stepAIC(mod.base, scope = list(lower = ~1, upper = ~Region + DeliveryMethod + TobaccoUse + AverageAgeofMother + Region * DeliveryMethod + Region * TobaccoUse + Region * AverageAgeofMother + DeliveryMethod * TobaccoUse + DeliveryMethod * AverageAgeofMother + TobaccoUse * AverageAgeofMother), direction = "both", k = log(nrow(Natality)))
-summary(mod.forwardstep)
 ```
 
 
@@ -208,7 +232,6 @@ summary(mod.forwardstep)
 
 ```{r}
 mod.two <- lm(AverageBirthWeight ~ Region + DeliveryMethod + TobaccoUse + AverageAgeofMother + TobaccoUse*AverageAgeofMother + Region*TobaccoUse, data = Natality)
-summary(mod.two)
 ```
 
 
@@ -243,6 +266,11 @@ head(resid_mod_two)
 ```{r, message = F, warning = F}
 vif(mod.two)
 ```
+
+On the basis of high variance inflation factors for the coefficients of all of the interaction terms that remain after the stepAIC elimination process, we must reject the notion that interaction terms are needed in our model.  Therefore, our model (mod.base) describes the average birth weight of an infant as a linear combination of TobaccoUse, Region, DeliveryMethod, and AverageAgeofMother.  We believe that these are all significant and linear predictors of birth weight.  
+
+
+## Further proof of linearity for our chosen model:  
 
 In order to assess whether our variables are linearly correlated average birth weight, we have created the following (component + ) partial residual plots for our chosen model.  
 
