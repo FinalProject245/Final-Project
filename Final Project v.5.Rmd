@@ -38,8 +38,11 @@ Natality <- Natality[!(Natality$Education == "Unknown/Not on certificate"),]
 
 Natality$EducationCode <- factor(Natality$EducationCode, labels = c("8thGrade", "12thGrade", "HS/GED", "SomeCollege", "AssociateDegree", "BachelorsDegree", "Masters", "Doctorate"))
 
-Natality$Region <- factor(Natality$Region, 
-                          labels = c("NorthEast", "MidWest", "South", "SouthWest", "West"))
+# Removes all table entries where DeliveryMethod is not stated.  
+
+Natality <- Natality[!(Natality$DeliveryMethod == "Not Stated"),]
+
+Natality$Region <- factor(Natality$Region, labels = c("NorthEast", "MidWest", "South", "SouthWest", "West"))
 
 # Turns the Average Birth Weight column into a numeric.  
 
